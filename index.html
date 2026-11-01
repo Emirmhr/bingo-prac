@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bingo del Debate</title>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--ink:#1d1d1f;--muted:#6b6b70;--line:#d9d5cc;--acc:#1f3864;--mark:#ffd966;--ok:#2e7d32;--bad:#c62828}
+@media (prefers-color-scheme:dark){:root{--bg:#141416;--card:#1f1f23;--ink:#f2f2f3;--muted:#a0a0a8;--line:#34343a;--acc:#8fb0ff;--mark:#8a6d12}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1{font-size:24px;margin:4px 0 12px}
+h2{font-size:18px;margin:20px 0 8px}
+.hidden{display:none!important}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+label{display:block;font-weight:600;margin:12px 0 6px}
+input{width:100%;font-size:19px;padding:12px;border:2px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+button{font-size:17px;padding:12px 16px;border-radius:10px;border:0;background:var(--acc);color:#fff;font-weight:600;cursor:pointer}
+@media (prefers-color-scheme:dark){button{color:#111}}
+button.ghost{background:transparent;color:var(--acc);border:2px solid var(--acc)}
+button.small{font-size:14px;padding:6px 10px}
+button.full{width:100%;margin-top:16px}
+.muted{color:var(--muted);font-size:15px}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.cell{position:relative;aspect-ratio:1/1;background:var(--card);border:2px solid var(--line);border-radius:10px;padding:4px;font-size:12px;line-height:1.2;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;user-select:none;overflow:hidden;word-break:break-word}
+@media (min-width:560px){.cell{font-size:14px}}
+.cell.on{background:var(--mark);border-color:#b8902a;font-weight:600}
+.cell.free{background:var(--acc);color:#fff;font-weight:700;cursor:default}
+.cell .n{position:absolute;top:2px;right:4px;font-size:11px;font-weight:700;color:var(--muted)}
+.cell.on .n{color:#5a4300}
+.cell.hot{box-shadow:inset 0 0 0 3px #e0892a}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px}
+.chip{flex:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:15px;white-space:nowrap}
+.chip.me{border:2px solid var(--acc)}
+.bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin:6px 0 2px}
+.bar i{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
+.banner{background:var(--ok);color:#fff;padding:10px 14px;border-radius:10px;margin:8px 0;font-weight:600}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
+.row span{flex:1}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;font-size:15px;z-index:9}
+.status{font-size:13px}
+</style>
+</head>
+<body>
+<main>
+
+<!-- ENTRADA -->
+<section id="login" class="box">
+  <h1>Bingo del Debate</h1>
+  <p class="muted">Escribe tu nombre y el código del club. Solo se pide una vez.</p>
+  <label for="nm">Tu nombre</label>
+  <input id="nm" maxlength="24" autocomplete="name" placeholder="Ej.: Ana">
+  <label for="cd">Código del club</label>
+  <input id="cd" maxlength="20" autocapitalize="off" placeholder="Te lo dan en el grupo">
+  <button class="full" id="go">Entrar</button>
+  <p id="lerr" class="muted"></p>
+</section>
+
+<!-- JUEGO -->
+<section id="game" class="hidden">
+  <div class="top">
+    <h1 style="margin:0">Bingo del Debate</h1>
+    <span class="status muted" id="conn">Conectando…</span>
+  </div>
+  <p class="muted" style="margin:4px 0 8px">Toca una casilla cuando pase. Toca otra vez para desmarcar. El número de la esquina indica cuántos la marcaron.</p>
+
+  <div class="chips" id="players"></div>
+  <div id="banner" class="banner hidden"></div>
+  <div id="nocard" class="box hidden"><p>Todavía no hay cartón para esta sesión. El organizador lo genera en un momento.</p></div>
+  <div class="grid" id="grid"></div>
+
+  <div class="box" style="margin-top:12px">
+    <b>Meta del grupo</b> <span class="muted" id="goaltxt"></span>
+    <div class="bar"><i id="goalbar"></i></div>
+    <span class="muted">Casillas que ya pasaron, contando lo que marcó cualquiera.</span>
+  </div>
+
+  <div class="box">
+    <b>¿Se te ocurre una casilla?</b>
+    <input id="sg" maxlength="90" placeholder="Ej.: Alguien dice «en conclusión» dos veces" style="margin-top:8px">
+    <button class="full" id="sgb">Enviar sugerencia</button>
+    <p class="muted">Las casillas deben tratar sobre situaciones, nunca sobre una persona en concreto.</p>
+  </div>
+
+  <p class="muted" style="text-align:center">
+    <a href="#" id="out">Cambiar nombre</a> · <a href="#" id="adm">Organizar</a>
+  </p>
+</section>
+
+<!-- ORGANIZADOR -->
+<section id="admin" class="hidden">
+  <div class="top"><h1 style="margin:0">Organizar</h1><button class="ghost small" id="back">Volver al juego</button></div>
+  <div class="box">
+    <button id="newcard">Nuevo cartón para la sesión</button>
+    <p class="muted">Elige 24 casillas al azar entre las aprobadas y borra las marcas de todos.</p>
+    <button class="ghost small" id="seed">Cargar las 25 casillas iniciales</button>
+  </div>
+  <h2>Sugerencias por revisar</h2><div class="box" id="pend"></div>
+  <h2>Casillas aprobadas (<span id="nok">0</span>)</h2><div class="box" id="okl"></div>
+  <h2>Jugadores</h2><div class="box" id="pl"></div>
+</section>
+
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+// ===== CONFIGURACIÓN (pega aquí la dirección de tu base si cambia) =====
+const firebaseConfig = {
+  apiKey: "AIzaSyAPI0BFEvMsZqXcb0ZgyH27N-6WzNsvfRk",
+  authDomain: "bingo-prac.firebaseapp.com",
+  databaseURL: "https://bingo-prac-default-rtdb.firebaseio.com",
+  projectId: "bingo-prac",
+  storageBucket: "bingo-prac.firebasestorage.app",
+  messagingSenderId: "545341158429",
+  appId: "1:545341158429:web:39b459e1ed2228127042f4"
+};
+const INICIALES = [
+"El profe hace una pregunta de sí o no","Alguien cuenta una anécdota personal que nadie pidió","Alguien se equivoca de postura","A alguien se le corta el internet","Alguien habla con el micrófono apagado","Aparece una mascota, un familiar o ruido de fondo","Alguien rompe o tira algo teatralizando","Alguien cita a Platón, Aristóteles o Sócrates","Alguien se levanta de la silla en pleno discurso","Alguien usa 1984 u Orwell como referencia","Alguien dice «con todo respeto» justo antes de una pulla","Alguien se queda en blanco más de 5 segundos","Alguien se ríe de su propio chiste","Alguien dice «como dije anteriormente» en el cierre","Alguien dice «eso es una falacia» sin nombrar cuál","Alguien lee claramente de otra pantalla","Alguien dice «déjame terminar»","Alguien responde una pregunta con otra pregunta","Empate técnico","Alguien dice «imagínense» para arrancar un escenario","Alguien golpea la mesa para enfatizar","Alguien empieza con «Buenas noches, señores jurados» en tono de noticiero","Alguien dice «no respondiste mi pregunta»","Alguien acepta un argumento del rival en voz alta","Alguien usa una analogía con comida"];
+
+// ===== utilidades =====
+const $ = id => document.getElementById(id);
+const ls = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}, del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
+function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2500)}
+function show(id){["login","game","admin"].forEach(s=>$(s).classList.toggle("hidden",s!==id))}
+function uid(){return Math.random().toString(36).slice(2,10)+Date.now().toString(36)}
+
+let db, room, me, card=null, players={}, pool={};
+let pid = ls.get("bingo_pid"); if(!pid){pid=uid();ls.set("bingo_pid",pid)}
+
+try{ firebase.initializeApp(firebaseConfig); db = firebase.database(); }
+catch(e){ $("lerr").textContent = "No se pudo conectar. Avísale al organizador."; }
+
+// ===== entrada =====
+$("nm").value = ls.get("bingo_name")||"";
+$("cd").value = ls.get("bingo_code")||"";
+$("go").onclick = enter;
+[$("nm"),$("cd")].forEach(i=>i.addEventListener("keydown",e=>{if(e.key==="Enter")enter()}));
+function enter(){
+  const name=$("nm").value.trim().slice(0,24), code=norm($("cd").value);
+  if(!name){$("lerr").textContent="Escribe tu nombre.";return}
+  if(code.length<4){$("lerr").textContent="El código del club tiene al menos 4 letras o números.";return}
+  ls.set("bingo_name",name); ls.set("bingo_code",code);
+  me=name; start(code);
+}
+$("out").onclick=e=>{e.preventDefault();ls.del("bingo_name");location.reload()};
+if(ls.get("bingo_name") && ls.get("bingo_code")){ me=ls.get("bingo_name"); start(ls.get("bingo_code")); }
+
+function start(code){
+  if(!db) return;
+  room = db.ref("rooms/"+code);
+  show("game");
+  const meRef = room.child("players/"+pid);
+  meRef.update({name:me, seen:firebase.database.ServerValue.TIMESTAMP});
+  db.ref(".info/connected").on("value",s=>{
+    $("conn").textContent = s.val() ? "● En línea" : "○ Sin conexión, se guarda al volver";
+    $("conn").style.color = s.val() ? "var(--ok)" : "var(--bad)";
+  });
+  room.child("card").on("value",s=>{card=s.val();render()});
+  room.child("players").on("value",s=>{players=s.val()||{};render();renderAdmin()});
+  room.child("pool").on("value",s=>{pool=s.val()||{};renderAdmin()});
+}
+
+// ===== juego =====
+function marksOf(p){ return (card && p && p.marks && p.marks.s===card.id) ? (p.marks.m||{}) : {} }
+const LINES = (()=>{const L=[];for(let i=0;i<5;i++){L.push([0,1,2,3,4].map(j=>i*5+j));L.push([0,1,2,3,4].map(j=>j*5+i))}L.push([0,6,12,18,24]);L.push([4,8,12,16,20]);return L})();
+function lines(m){return LINES.filter(l=>l.every(i=>i===12||m[i])).length}
+
+function render(){
+  const g=$("grid"); g.innerHTML="";
+  $("nocard").classList.toggle("hidden",!!card);
+  if(!card){ $("players").innerHTML=""; return }
+  const mine = marksOf(players[pid]);
+  const count = {}; const plist = Object.entries(players).filter(([,p])=>p.name);
+  plist.forEach(([,p])=>{const m=marksOf(p);for(const k in m)if(m[k])count[k]=(count[k]||0)+1});
+  const total = plist.length||1;
+  for(let i=0;i<25;i++){
+    const c=document.createElement("div"); c.className="cell";
+    if(i===12){c.classList.add("free");c.textContent="LIBRE";g.appendChild(c);continue}
+    const idx = i<12?i:i-1;
+    c.textContent = card.items[idx];
+    if(mine[i]) c.classList.add("on");
+    if(count[i]){const n=document.createElement("span");n.className="n";n.textContent=count[i];c.appendChild(n);if(total>2&&count[i]/total>=0.5)c.classList.add("hot")}
+    c.onclick=()=>toggle(i,!mine[i]);
+    g.appendChild(c);
+  }
+  // jugadores
+  const ch=$("players"); ch.innerHTML="";
+  plist.map(([id,p])=>({id,name:p.name,n:Object.values(marksOf(p)).filter(Boolean).length,l:lines(marksOf(p))}))
+    .sort((a,b)=>b.n-a.n)
+    .forEach(p=>{const d=document.createElement("span");d.className="chip"+(p.id===pid?" me":"");
+      d.textContent=(p.l?"⭐ ":"")+p.name+(p.id===pid?" (tú)":"")+" · "+p.n;ch.appendChild(d)});
+  // meta del grupo
+  const done = Object.keys(count).length;
+  $("goaltxt").textContent = done+" de 24";
+  $("goalbar").style.width = (done/24*100)+"%";
+  // primera línea
+  const first = plist.filter(([,p])=>lines(marksOf(p))>0).sort((a,b)=>(a[1].marks.lt||9e15)-(b[1].marks.lt||9e15))[0];
+  const b=$("banner");
+  if(done===24){b.textContent="¡El grupo completó todo el cartón!";b.classList.remove("hidden")}
+  else if(first){b.textContent="Primera línea: "+first[1].name;b.classList.remove("hidden")}
+  else b.classList.add("hidden");
+}
+function toggle(i,on){
+  if(!card) return;
+  const p=players[pid]||{}; const m={...marksOf(p)};
+  if(on) m[i]=true; else delete m[i];
+  const upd={s:card.id,m};
+  const had=marksOf(p), hadLine=lines(had)>0, hasLine=lines(m)>0;
+  if(hasLine) upd.lt = hadLine && p.marks.lt ? p.marks.lt : Date.now();
+  room.child("players/"+pid+"/marks").set(upd);
+}
+
+// ===== sugerencias =====
+$("sgb").onclick=()=>{
+  const t=$("sg").value.trim().slice(0,90); if(t.length<4){toast("Escribe la casilla primero");return}
+  room.child("pool").push({text:t,by:me,ok:false,t:Date.now()}).then(()=>{$("sg").value="";toast("¡Enviada! El organizador la revisa.")});
+};
+
+// ===== organizador =====
+$("adm").onclick=async e=>{
+  e.preventDefault();
+  const s=await room.child("config/pin").get(); const pin=s.val();
+  if(!pin){const n=prompt("Crea un PIN de organizador (4 a 8 números). Guárdalo, nadie más debe saberlo.");if(!n||!/^\d{4,8}$/.test(n))return;await room.child("config/pin").set(n);sessionStorage.setItem("adm","1")}
+  else if(sessionStorage.getItem("adm")!=="1"){const n=prompt("PIN de organizador:");if(n!==pin){toast("PIN incorrecto");return}sessionStorage.setItem("adm","1")}
+  show("admin"); renderAdmin();
+};
+$("back").onclick=()=>show("game");
+$("seed").onclick=()=>{
+  const have=new Set(Object.values(pool).map(p=>norm(p.text)));
+  const upd={}; INICIALES.forEach(t=>{if(!have.has(norm(t)))upd[room.child("pool").push().key]={text:t,by:"Club",ok:true,t:Date.now()}});
+  if(!Object.keys(upd).length){toast("Ya estaban cargadas");return}
+  room.child("pool").update(upd).then(()=>toast("Casillas cargadas"));
+};
+$("newcard").onclick=()=>{
+  const ok=Object.values(pool).filter(p=>p.ok).map(p=>p.text);
+  if(ok.length<24){toast("Necesitas al menos 24 aprobadas (hay "+ok.length+")");return}
+  if(card && !confirm("Esto borra las marcas de todos y saca un cartón nuevo. ¿Seguir?")) return;
+  for(let i=ok.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ok[i],ok[j]]=[ok[j],ok[i]]}
+  room.child("card").set({id:uid(),items:ok.slice(0,24),t:Date.now()}).then(()=>{toast("Cartón nuevo listo");show("game")});
+};
+function row(text,btns){const r=document.createElement("div");r.className="row";const s=document.createElement("span");s.textContent=text;r.appendChild(s);btns.forEach(([l,f,g])=>{const b=document.createElement("button");b.className="small"+(g?" ghost":"");b.textContent=l;b.onclick=f;r.appendChild(b)});return r}
+function renderAdmin(){
+  if($("admin").classList.contains("hidden")) return;
+  const pe=$("pend"),ok=$("okl"),pl=$("pl"); pe.innerHTML=ok.innerHTML=pl.innerHTML="";
+  const ents=Object.entries(pool).sort((a,b)=>a[1].t-b[1].t);
+  const pend=ents.filter(([,p])=>!p.ok), apr=ents.filter(([,p])=>p.ok);
+  if(!pend.length) pe.innerHTML='<p class="muted">No hay sugerencias nuevas.</p>';
+  pend.forEach(([k,p])=>pe.appendChild(row(p.text+"  — "+(p.by||"?"),[["Aprobar",()=>room.child("pool/"+k+"/ok").set(true)],["Borrar",()=>room.child("pool/"+k).remove(),1]])));
+  $("nok").textContent=apr.length;
+  apr.forEach(([k,p])=>ok.appendChild(row(p.text,[["Quitar",()=>room.child("pool/"+k).remove(),1]])));
+  Object.entries(players).forEach(([k,p])=>pl.appendChild(row(p.name||"?",[["Sacar",()=>{if(confirm("¿Sacar a "+p.name+"?"))room.child("players/"+k).remove()},1]])));
+}
+</script>
+</body>
+</html>
