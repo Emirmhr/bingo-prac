@@ -79,6 +79,15 @@ button.full{width:100%;margin-top:14px}
 .banner{background:var(--accent);color:var(--free-ink);border-radius:var(--radius);padding:12px 16px;margin:0 0 12px;font-weight:800}
 .row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line)}
 .row span{flex:1}
+/* cronómetro y bloqueo */
+.timer{display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:var(--radius);padding:12px 16px;margin:0 0 12px;font-weight:800;font-size:18px;background:var(--paper);color:var(--ink2);box-shadow:var(--shadow);position:relative;overflow:hidden}
+.timer.open{background:var(--primary);color:var(--primary-ink)}
+.timer .num{font-family:var(--t-font);font-size:34px;line-height:1;font-variant-numeric:tabular-nums}
+.timer .drain{position:absolute;left:0;bottom:0;height:5px;background:var(--accent);width:0}
+.grid.locked .cell{cursor:not-allowed}
+.orgrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.orgrow input{width:84px;padding:10px;font-size:17px;text-align:center}
+.orgrow label{margin:0}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:11px 18px;border-radius:999px;font-size:15px;font-weight:600;z-index:9;max-width:90vw}
 </style>
 </head>
@@ -103,19 +112,24 @@ button.full{width:100%;margin-top:14px}
     <h1>Bingo del Debate</h1>
     <span class="status muted" id="conn">Conectando…</span>
   </div>
-  <p class="lead">Toca una casilla cuando pase; otro toque la desmarca. El número de la esquina es cuántos la marcaron.</p>
+  <p class="lead">Mira el cartón durante el debate. Después de la votación se abre el marcado por unos segundos: toca lo que pasó. El primero en hacer línea (fila, columna o diagonal) gana 0.5.</p>
+
+  <div id="orgbar" class="box hidden">
+    <b>Organizador</b>
+    <div class="orgrow">
+      <label for="secs">Segundos</label>
+      <input id="secs" type="number" min="10" max="60" step="5" value="30">
+      <button id="openb">Abrir marcado</button>
+      <button class="ghost" id="lockb">Bloquear ya</button>
+    </div>
+    <div class="orgrow"><button class="ghost small" id="newcard2">Nuevo cartón (antes de cada debate)</button></div>
+  </div>
 
   <div class="chips" id="players"></div>
+  <div id="timer" class="timer"><span id="tlabel">🔒 Marcado bloqueado</span><span class="num" id="tnum"></span><i class="drain" id="tdrain"></i></div>
   <div id="banner" class="banner hidden"></div>
   <div id="nocard" class="box hidden"><p>Todavía no hay cartón para esta sesión. El organizador lo genera en un momento.</p></div>
-  <div class="grid" id="grid"></div>
-
-  <div class="box" id="predbox" style="margin-top:12px">
-    <b>Mi predicción</b> <span class="muted">(va en el centro de tu cartón; márcala si pasa)</span>
-    <input id="pr" maxlength="60" placeholder="Ej.: Alguien va a citar a Nietzsche" style="margin-top:8px">
-    <button class="full" id="prb">Guardar predicción</button>
-    <p class="muted">Toca el nombre de alguien arriba para ver su predicción.</p>
-  </div>
+  <div class="grid locked" id="grid"></div>
 
   <div class="box" style="margin-top:12px">
     <b>Meta del grupo</b> <span class="muted" id="goaltxt"></span>
@@ -175,10 +189,14 @@ const $ = id => document.getElementById(id);
 const ls = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}, del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
 function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2500)}
-function show(id){["login","game","admin"].forEach(s=>$(s).classList.toggle("hidden",s!==id))}
+function show(id){["login","game","admin"].forEach(s=>$(s).classList.toggle("hidden",s!==id));if(id==="game")$("orgbar").classList.toggle("hidden",!isAdm())}
+const ss = {get(k){try{return sessionStorage.getItem(k)}catch(e){return null}}, set(k,v){try{sessionStorage.setItem(k,v)}catch(e){}}};
+function isAdm(){return ss.get("adm")==="1"}
 function uid(){return Math.random().toString(36).slice(2,10)+Date.now().toString(36)}
 
-let db, room, me, card=null, players={}, pool={};
+let db, room, me, card=null, players={}, pool={}, openSt=null, offset=0, wasOpen=false;
+const now = () => Date.now()+offset;           // hora del servidor, igual para todos
+const isOpen = () => !!(openSt && openSt.until > now());
 let pid = ls.get("bingo_pid"); if(!pid){pid=uid();ls.set("bingo_pid",pid)}
 
 try{ firebase.initializeApp(firebaseConfig); db = firebase.database(); }
@@ -209,6 +227,8 @@ function start(code){
     $("conn").textContent = s.val() ? "En línea" : "Sin conexión: se guarda al volver";
     $("conn").style.color = s.val() ? "var(--ok)" : "var(--bad)";
   });
+  db.ref(".info/serverTimeOffset").on("value",s=>{offset=s.val()||0});
+  room.child("config/open").on("value",s=>{openSt=s.val();tick();render()});
   room.child("card").on("value",s=>{card=s.val();render()});
   room.child("players").on("value",s=>{players=s.val()||{};render();renderAdmin()});
   room.child("pool").on("value",s=>{pool=s.val()||{};renderAdmin()});
@@ -217,13 +237,35 @@ function start(code){
 // ===== juego =====
 function marksOf(p){ return (card && p && p.marks && p.marks.s===card.id) ? (p.marks.m||{}) : {} }
 const LINES = (()=>{const L=[];for(let i=0;i<5;i++){L.push([0,1,2,3,4].map(j=>i*5+j));L.push([0,1,2,3,4].map(j=>j*5+i))}L.push([0,6,12,18,24]);L.push([4,8,12,16,20]);return L})();
-function lines(m){return LINES.filter(l=>l.every(i=>m[i])).length}
-function predOf(p){ return (card && p && p.marks && p.marks.s===card.id) ? (p.marks.p||"") : "" }
+function lines(m){const f={...m,12:true};return LINES.filter(l=>l.every(i=>f[i])).length}   // el centro es libre
+
+// ===== cronómetro =====
+function tick(){
+  const t=$("timer"), open=isOpen();
+  t.classList.toggle("open",open); $("grid").classList.toggle("locked",!open);
+  if(open){
+    const left=Math.max(0,openSt.until-now()), secs=openSt.secs||30;
+    $("tlabel").textContent="⏱ ¡Marquen ahora!";
+    $("tnum").textContent=Math.ceil(left/1000)+" s";
+    $("tdrain").style.width=(left/(secs*1000)*100)+"%";
+  }else{
+    $("tlabel").textContent="🔒 Marcado bloqueado"; $("tnum").textContent=""; $("tdrain").style.width="0";
+  }
+  if(wasOpen && !open) toast("Se acabó el tiempo: marcado bloqueado");
+  wasOpen=open;
+}
+setInterval(tick,200);
+
+$("openb").onclick=()=>{
+  if(!card){toast("Primero genera un cartón");return}
+  let s=parseInt($("secs").value,10); if(!s||s<10)s=10; if(s>60)s=60; $("secs").value=s;
+  room.child("config/open").set({until:now()+s*1000,secs:s});
+};
+$("lockb").onclick=()=>room.child("config/open").set(null);
 
 function render(){
   const g=$("grid"); g.innerHTML="";
-  $("nocard").classList.toggle("hidden",!!card); $("predbox").classList.toggle("hidden",!card);
-  if(card && document.activeElement!==$("pr")) $("pr").value=predOf(players[pid]);
+  $("nocard").classList.toggle("hidden",!!card);
   if(!card){ $("players").innerHTML=""; return }
   const mine = marksOf(players[pid]);
   const count = {}; const plist = Object.entries(players).filter(([,p])=>p.name);
@@ -231,11 +273,7 @@ function render(){
   const total = plist.length||1;
   for(let i=0;i<25;i++){
     const c=document.createElement("div"); c.className="cell";
-    if(i===12){
-      const pr=predOf(players[pid]); c.classList.add("free");
-      if(!pr){c.classList.add("empty");c.textContent="Escribe aquí abajo tu predicción";c.onclick=()=>$("pr").focus()}
-      else{const t=document.createElement("span");t.className="tag";t.textContent="mi predicción";c.appendChild(t);c.appendChild(document.createTextNode(pr));if(mine[12])c.classList.add("on");c.onclick=()=>toggle(12,!mine[12])}
-      g.appendChild(c);continue}
+    if(i===12){ c.classList.add("free"); c.textContent="LIBRE"; c.style.cursor="default"; g.appendChild(c); continue }
     const idx = i<12?i:i-1;
     c.textContent = card.items[idx];
     if(mine[i]) c.classList.add("on");
@@ -248,8 +286,7 @@ function render(){
   plist.map(([id,p])=>({id,name:p.name,n:Object.values(marksOf(p)).filter(Boolean).length,l:lines(marksOf(p))}))
     .sort((a,b)=>b.n-a.n)
     .forEach(p=>{const d=document.createElement("span");d.className="chip"+(p.id===pid?" me":"");
-      d.className+=p.l?" line":"";d.textContent=p.name+(p.id===pid?" (tú)":"");const nb=document.createElement("b");nb.textContent=p.n;d.appendChild(nb);d.title=p.l?"Tiene línea":"";
-      d.onclick=()=>{const pr=predOf(players[p.id]);toast(pr?p.name+" predice: "+pr:p.name+" aún no escribe su predicción")};ch.appendChild(d)});
+      d.className+=p.l?" line":"";d.textContent=p.name+(p.id===pid?" (tú)":"");const nb=document.createElement("b");nb.textContent=p.n;d.appendChild(nb);d.title=p.l?"Tiene línea":"";ch.appendChild(d)});
   // meta del grupo
   const done = Object.keys(count).length;
   $("goaltxt").textContent = done+" de 24";
@@ -258,26 +295,20 @@ function render(){
   const first = plist.filter(([,p])=>lines(marksOf(p))>0).sort((a,b)=>(a[1].marks.lt||9e15)-(b[1].marks.lt||9e15))[0];
   const b=$("banner");
   if(done===24){b.textContent="¡El grupo completó todo el cartón!";b.classList.remove("hidden")}
-  else if(first){b.textContent="Primera línea: "+first[1].name;b.classList.remove("hidden")}
+  else if(first){b.textContent="🏆 Primera línea: "+first[1].name+" (+0.5)";b.classList.remove("hidden")}
   else b.classList.add("hidden");
 }
 function toggle(i,on){
   if(!card) return;
+  if(!isOpen()){toast("🔒 El marcado está bloqueado");return}
   const p=players[pid]||{}; const m={...marksOf(p)};
   if(on) m[i]=true; else delete m[i];
-  const upd={s:card.id,m}; const pr=predOf(p); if(pr) upd.p=pr;
+  const upd={s:card.id,m};
   const had=marksOf(p), hadLine=lines(had)>0, hasLine=lines(m)>0;
-  if(hasLine) upd.lt = hadLine && p.marks.lt ? p.marks.lt : Date.now();
+  // la hora de la línea la pone el servidor: gana quien llegó primero, no quien tiene el reloj adelantado
+  if(hasLine) upd.lt = hadLine && p.marks.lt ? p.marks.lt : firebase.database.ServerValue.TIMESTAMP;
   room.child("players/"+pid+"/marks").set(upd);
 }
-
-$("prb").onclick=()=>{
-  if(!card) return; const t=$("pr").value.trim().slice(0,60);
-  const p=players[pid]||{}; const upd={s:card.id,m:{...marksOf(p)}};
-  if(p.marks&&p.marks.s===card.id&&p.marks.lt) upd.lt=p.marks.lt;
-  if(t) upd.p=t; else delete upd.m[12];
-  room.child("players/"+pid+"/marks").set(upd).then(()=>toast(t?"Predicción guardada":"Predicción borrada"));
-};
 // ===== sugerencias =====
 $("sgb").onclick=()=>{
   const t=$("sg").value.trim().slice(0,90); if(t.length<4){toast("Escribe la casilla primero");return}
@@ -288,8 +319,8 @@ $("sgb").onclick=()=>{
 $("adm").onclick=async e=>{
   e.preventDefault();
   const s=await room.child("config/pin").get(); const pin=s.val();
-  if(!pin){const n=prompt("Crea un PIN de organizador (4 a 8 números). Guárdalo, nadie más debe saberlo.");if(!n||!/^\d{4,8}$/.test(n))return;await room.child("config/pin").set(n);sessionStorage.setItem("adm","1")}
-  else if(sessionStorage.getItem("adm")!=="1"){const n=prompt("PIN de organizador:");if(n!==pin){toast("PIN incorrecto");return}sessionStorage.setItem("adm","1")}
+  if(!pin){const n=prompt("Crea un PIN de organizador (4 a 8 números). Guárdalo, nadie más debe saberlo.");if(!n||!/^\d{4,8}$/.test(n))return;await room.child("config/pin").set(n);ss.set("adm","1")}
+  else if(!isAdm()){const n=prompt("PIN de organizador:");if(n!==pin){toast("PIN incorrecto");return}ss.set("adm","1")}
   show("admin"); renderAdmin();
 };
 $("back").onclick=()=>show("game");
@@ -307,13 +338,15 @@ $("addb").onclick=()=>{
   if(Object.values(pool).some(p=>norm(p.text)===norm(t))){toast("Esa casilla ya existe");return}
   room.child("pool").push({text:t,by:me,ok:true,t:Date.now()}).then(()=>{$("addt").value="";toast("Casilla agregada")});
 };
-$("newcard").onclick=()=>{
+function newCard(){
   const ok=Object.values(pool).filter(p=>p.ok).map(p=>p.text);
   if(ok.length<24){toast("Necesitas al menos 24 aprobadas (hay "+ok.length+")");return}
   if(card && !confirm("Esto borra las marcas de todos y saca un cartón nuevo. ¿Seguir?")) return;
   for(let i=ok.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ok[i],ok[j]]=[ok[j],ok[i]]}
+  room.child("config/open").set(null);   // el cartón nuevo arranca bloqueado
   room.child("card").set({id:uid(),items:ok.slice(0,24),t:Date.now()}).then(()=>{toast("Cartón nuevo listo");show("game")});
-};
+}
+$("newcard").onclick=newCard; $("newcard2").onclick=newCard;
 function row(text,btns){const r=document.createElement("div");r.className="row";const s=document.createElement("span");s.textContent=text;r.appendChild(s);btns.forEach(([l,f,g])=>{const b=document.createElement("button");b.className="small"+(g?" ghost":"");b.textContent=l;b.onclick=f;r.appendChild(b)});return r}
 function renderAdmin(){
   if($("admin").classList.contains("hidden")) return;
