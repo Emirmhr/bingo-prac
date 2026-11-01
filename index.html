@@ -88,6 +88,12 @@ button.full{width:100%;margin-top:14px}
 .orgrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
 .orgrow input{width:84px;padding:10px;font-size:17px;text-align:center}
 .orgrow label{margin:0}
+.sw{display:inline-flex;align-items:center;gap:10px;background:transparent;color:var(--ink);padding:8px 4px;font-size:16px}
+.sw i{position:relative;width:52px;height:30px;border-radius:999px;background:var(--line);transition:background .15s}
+.sw i::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--paper);transition:left .15s}
+.sw.on i{background:var(--primary)}
+.sw.on i::after{left:25px}
+@media (prefers-reduced-motion:reduce){.sw i,.sw i::after{transition:none}}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:11px 18px;border-radius:999px;font-size:15px;font-weight:600;z-index:9;max-width:90vw}
 </style>
 </head>
@@ -119,8 +125,10 @@ button.full{width:100%;margin-top:14px}
     <div class="orgrow">
       <label for="secs">Segundos</label>
       <input id="secs" type="number" min="10" max="60" step="5" value="30">
-      <button id="openb">Abrir marcado</button>
-      <button class="ghost" id="lockb">Bloquear ya</button>
+      <button id="openb">Abrir con tiempo</button>
+    </div>
+    <div class="orgrow">
+      <button class="sw" id="swb" role="switch" aria-checked="false"><i></i><span id="swt">Marcado bloqueado</span></button>
     </div>
     <div class="orgrow"><button class="ghost small" id="newcard2">Nuevo cartón (antes de cada debate)</button></div>
   </div>
@@ -196,7 +204,7 @@ function uid(){return Math.random().toString(36).slice(2,10)+Date.now().toString
 
 let db, room, me, card=null, players={}, pool={}, openSt=null, offset=0, wasOpen=false;
 const now = () => Date.now()+offset;           // hora del servidor, igual para todos
-const isOpen = () => !!(openSt && openSt.until > now());
+const isOpen = () => !!(openSt && (openSt.free || openSt.until > now()));   // free = abierto a mano, sin tiempo
 let pid = ls.get("bingo_pid"); if(!pid){pid=uid();ls.set("bingo_pid",pid)}
 
 try{ firebase.initializeApp(firebaseConfig); db = firebase.database(); }
@@ -244,14 +252,18 @@ function tick(){
   const t=$("timer"), open=isOpen();
   t.classList.toggle("open",open); $("grid").classList.toggle("locked",!open);
   if(open){
-    const left=Math.max(0,openSt.until-now()), secs=openSt.secs||30;
-    $("tlabel").textContent="⏱ ¡Marquen ahora!";
-    $("tnum").textContent=Math.ceil(left/1000)+" s";
-    $("tdrain").style.width=(left/(secs*1000)*100)+"%";
+    if(openSt.free){ $("tlabel").textContent="🔓 Marcado abierto"; $("tnum").textContent=""; $("tdrain").style.width="0"; }
+    else{
+      const left=Math.max(0,openSt.until-now()), secs=openSt.secs||30;
+      $("tlabel").textContent="⏱ ¡Marquen ahora!";
+      $("tnum").textContent=Math.ceil(left/1000)+" s";
+      $("tdrain").style.width=(left/(secs*1000)*100)+"%";
+    }
   }else{
     $("tlabel").textContent="🔒 Marcado bloqueado"; $("tnum").textContent=""; $("tdrain").style.width="0";
   }
-  if(wasOpen && !open) toast("Se acabó el tiempo: marcado bloqueado");
+  $("swb").classList.toggle("on",open); $("swb").setAttribute("aria-checked",open); $("swt").textContent=open?"Marcado activado":"Marcado bloqueado";
+  if(wasOpen && !open) toast("🔒 Marcado bloqueado");
   wasOpen=open;
 }
 setInterval(tick,200);
@@ -261,7 +273,10 @@ $("openb").onclick=()=>{
   let s=parseInt($("secs").value,10); if(!s||s<10)s=10; if(s>60)s=60; $("secs").value=s;
   room.child("config/open").set({until:now()+s*1000,secs:s});
 };
-$("lockb").onclick=()=>room.child("config/open").set(null);
+$("swb").onclick=()=>{
+  if(isOpen()) room.child("config/open").set(null);
+  else { if(!card){toast("Primero genera un cartón");return} room.child("config/open").set({free:true}); }
+};
 
 function render(){
   const g=$("grid"); g.innerHTML="";
