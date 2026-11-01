@@ -154,7 +154,7 @@ button.full{width:100%;margin-top:14px}
   <div class="top"><h1>Organizar</h1><button class="ghost small" id="back">Volver al juego</button></div>
   <div class="box">
     <button id="newcard">Nuevo cartón para la sesión</button>
-    <p class="muted">Elige 24 casillas al azar entre las aprobadas y borra las marcas de todos.</p>
+    <p class="muted">Elige 25 casillas al azar entre las aprobadas y borra las marcas de todos.</p>
     <button class="ghost small" id="seed">Actualizar casillas del club</button>
     <label for="addt">Agregar casilla (queda aprobada)</label>
     <input id="addt" maxlength="90" placeholder="Ej.: Alguien dice «en conclusión»">
@@ -237,7 +237,7 @@ function start(code){
 // ===== juego =====
 function marksOf(p){ return (card && p && p.marks && p.marks.s===card.id) ? (p.marks.m||{}) : {} }
 const LINES = (()=>{const L=[];for(let i=0;i<5;i++){L.push([0,1,2,3,4].map(j=>i*5+j));L.push([0,1,2,3,4].map(j=>j*5+i))}L.push([0,6,12,18,24]);L.push([4,8,12,16,20]);return L})();
-function lines(m){const f={...m,12:true};return LINES.filter(l=>l.every(i=>f[i])).length}   // el centro es libre
+function lines(m){return LINES.filter(l=>l.every(i=>m[i])).length}
 
 // ===== cronómetro =====
 function tick(){
@@ -269,13 +269,11 @@ function render(){
   if(!card){ $("players").innerHTML=""; return }
   const mine = marksOf(players[pid]);
   const count = {}; const plist = Object.entries(players).filter(([,p])=>p.name);
-  plist.forEach(([,p])=>{const m=marksOf(p);for(const k in m)if(m[k]&&k!=="12")count[k]=(count[k]||0)+1});
+  plist.forEach(([,p])=>{const m=marksOf(p);for(const k in m)if(m[k])count[k]=(count[k]||0)+1});
   const total = plist.length||1;
   for(let i=0;i<25;i++){
     const c=document.createElement("div"); c.className="cell";
-    if(i===12){ c.classList.add("free"); c.textContent="LIBRE"; c.style.cursor="default"; g.appendChild(c); continue }
-    const idx = i<12?i:i-1;
-    c.textContent = card.items[idx];
+    c.textContent = card.items[i]||"";
     if(mine[i]) c.classList.add("on");
     if(count[i]){const n=document.createElement("span");n.className="n";n.textContent=count[i];c.appendChild(n);if(total>2&&count[i]/total>=0.5)c.classList.add("hot")}
     c.onclick=()=>toggle(i,!mine[i]);
@@ -289,12 +287,12 @@ function render(){
       d.className+=p.l?" line":"";d.textContent=p.name+(p.id===pid?" (tú)":"");const nb=document.createElement("b");nb.textContent=p.n;d.appendChild(nb);d.title=p.l?"Tiene línea":"";ch.appendChild(d)});
   // meta del grupo
   const done = Object.keys(count).length;
-  $("goaltxt").textContent = done+" de 24";
-  $("goalbar").style.width = (done/24*100)+"%";
+  $("goaltxt").textContent = done+" de 25";
+  $("goalbar").style.width = (done/25*100)+"%";
   // primera línea
   const first = plist.filter(([,p])=>lines(marksOf(p))>0).sort((a,b)=>(a[1].marks.lt||9e15)-(b[1].marks.lt||9e15))[0];
   const b=$("banner");
-  if(done===24){b.textContent="¡El grupo completó todo el cartón!";b.classList.remove("hidden")}
+  if(done===25){b.textContent="¡El grupo completó todo el cartón!";b.classList.remove("hidden")}
   else if(first){b.textContent="🏆 Primera línea: "+first[1].name+" (+0.5)";b.classList.remove("hidden")}
   else b.classList.add("hidden");
 }
@@ -340,11 +338,11 @@ $("addb").onclick=()=>{
 };
 function newCard(){
   const ok=Object.values(pool).filter(p=>p.ok).map(p=>p.text);
-  if(ok.length<24){toast("Necesitas al menos 24 aprobadas (hay "+ok.length+")");return}
+  if(ok.length<25){toast("Necesitas al menos 25 aprobadas (hay "+ok.length+")");return}
   if(card && !confirm("Esto borra las marcas de todos y saca un cartón nuevo. ¿Seguir?")) return;
   for(let i=ok.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ok[i],ok[j]]=[ok[j],ok[i]]}
   room.child("config/open").set(null);   // el cartón nuevo arranca bloqueado
-  room.child("card").set({id:uid(),items:ok.slice(0,24),t:Date.now()}).then(()=>{toast("Cartón nuevo listo");show("game")});
+  room.child("card").set({id:uid(),items:ok.slice(0,25),t:Date.now()}).then(()=>{toast("Cartón nuevo listo");show("game")});
 }
 $("newcard").onclick=newCard; $("newcard2").onclick=newCard;
 function row(text,btns){const r=document.createElement("div");r.className="row";const s=document.createElement("span");s.textContent=text;r.appendChild(s);btns.forEach(([l,f,g])=>{const b=document.createElement("button");b.className="small"+(g?" ghost":"");b.textContent=l;b.onclick=f;r.appendChild(b)});return r}
