@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="es" data-tema="b">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bingo del Debate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Outfit:wght@400..800&family=Nunito:wght@400..800&family=Fredoka:wght@500..700&display=swap" rel="stylesheet">
+<style>
+/* ===== Tema A: Cobalto (claro, vivo) ===== */
+:root,[data-tema="a"]{
+  --bg:#EEF2FB; --paper:#FFFFFF; --ink:#16213A; --ink2:#3A4663; --muted:#6A7591; --line:#D6DDEE;
+  --primary:#2B59C3; --primary-ink:#FFFFFF; --mark:#F5B700; --mark-ink:#16213A; --accent:#F5B700; --hot:#E8553D;
+  --free:#16213A; --free-ink:#FFFFFF; --ok:#1E8A5A; --bad:#C2412D;
+  --t-font:"Bricolage Grotesque",system-ui,sans-serif; --b-font:"Bricolage Grotesque",system-ui,sans-serif;
+  --t-weight:800; --radius:14px; --cell-r:12px; --gap:6px; --shadow:0 1px 0 #D6DDEE,0 6px 18px -10px rgba(43,89,195,.35);
+}
+/* ===== Tema B: Noche (oscuro, menta) ===== */
+[data-tema="b"]{
+  --bg:#121A2B; --paper:#1C2740; --ink:#EEF2FA; --ink2:#C3CCE0; --muted:#8C98B3; --line:#2B3858;
+  --primary:#3DD9A0; --primary-ink:#0E1A16; --mark:#3DD9A0; --mark-ink:#0E1A16; --accent:#FFB547; --hot:#FFB547;
+  --free:#FFB547; --free-ink:#1A1405; --ok:#3DD9A0; --bad:#FF8A7A;
+  --t-font:"Outfit",system-ui,sans-serif; --b-font:"Outfit",system-ui,sans-serif;
+  --t-weight:700; --radius:16px; --cell-r:12px; --gap:6px; --shadow:0 8px 24px -14px rgba(0,0,0,.6);
+}
+/* ===== Tema C: Juego (claro, cálido, redondeado) ===== */
+[data-tema="c"]{
+  --bg:#FFF6EC; --paper:#FFFFFF; --ink:#2A1E2E; --ink2:#4C3E50; --muted:#85768A; --line:#F0DFCF;
+  --primary:#E4407B; --primary-ink:#FFFFFF; --mark:#E4407B; --mark-ink:#FFFFFF; --accent:#2BA59C; --hot:#2BA59C;
+  --free:#2BA59C; --free-ink:#FFFFFF; --ok:#1E8A5A; --bad:#C2412D;
+  --t-font:"Fredoka","Nunito",system-ui,sans-serif; --b-font:"Nunito",system-ui,sans-serif;
+  --t-weight:700; --radius:20px; --cell-r:16px; --gap:7px; --shadow:0 2px 0 #F0DFCF,0 10px 22px -16px rgba(228,64,123,.45);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:500 17px/1.45 var(--b-font)}
+main{max-width:640px;margin:0 auto;padding:20px 16px 40px}
+h1{font-family:var(--t-font);font-weight:var(--t-weight);font-size:clamp(32px,8.5vw,46px);line-height:1;letter-spacing:-.02em;margin:0;color:var(--ink)}
+h2{font-family:var(--t-font);font-weight:var(--t-weight);font-size:20px;margin:24px 0 8px}
+.hidden{display:none!important}
+a{color:var(--primary);text-underline-offset:3px;font-weight:600}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.box{background:var(--paper);border-radius:var(--radius);padding:18px;margin-bottom:14px;box-shadow:var(--shadow)}
+.lead{color:var(--ink2);margin:6px 0 14px;max-width:60ch}
+label{display:block;font-weight:700;margin:14px 0 6px}
+input{width:100%;font:inherit;font-size:18px;padding:13px 14px;border:2px solid var(--line);border-radius:calc(var(--radius) - 6px);background:var(--bg);color:var(--ink)}
+input:focus{outline:none;border-color:var(--primary)}
+button{font:inherit;font-weight:700;font-size:17px;padding:13px 18px;border-radius:calc(var(--radius) - 6px);border:0;background:var(--primary);color:var(--primary-ink);cursor:pointer}
+button:active{transform:translateY(1px)}
+button.ghost{background:transparent;color:var(--primary);box-shadow:inset 0 0 0 2px var(--primary)}
+button.small{font-size:14px;padding:7px 12px}
+button.full{width:100%;margin-top:14px}
+.muted{color:var(--muted);font-size:15px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.status{font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--paper)}
+/* cartón */
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--gap)}
+.cell{position:relative;min-height:96px;hyphens:auto;-webkit-hyphens:auto;padding:14px 4px 6px;font-size:11.5px;font-weight:600;line-height:1.2;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;user-select:none;word-break:break-word;background:var(--paper);border-radius:var(--cell-r);color:var(--ink);box-shadow:var(--shadow);transition:transform .12s,background .15s}
+@media (min-width:560px){.cell{font-size:14px;min-height:108px}}
+.cell:active{transform:scale(.97)}
+.cell.on{background:var(--mark);color:var(--mark-ink);font-weight:800}
+.cell .n{position:absolute;top:4px;right:6px;font-size:11px;font-weight:800;color:var(--muted)}
+.cell.on .n{color:inherit;opacity:.75}
+.cell.hot{box-shadow:inset 0 0 0 3px var(--hot),var(--shadow)}
+.cell.free{background:var(--free);color:var(--free-ink);font-weight:700}
+.cell.free.empty{background:transparent;color:var(--ink2);box-shadow:inset 0 0 0 2px var(--line);font-weight:600}
+.cell.free.on{box-shadow:inset 0 0 0 4px var(--mark),var(--shadow)}
+.cell.free .tag{position:absolute;top:4px;left:0;right:0;font-size:10px;opacity:.85}
+@media (prefers-reduced-motion:reduce){.cell{transition:none}}
+/* jugadores */
+.chips{display:flex;gap:8px;overflow-x:auto;padding:4px 0 12px}
+.chip{flex:none;background:var(--paper);border-radius:999px;padding:7px 14px;font-size:15px;font-weight:600;white-space:nowrap;cursor:pointer;color:var(--ink);box-shadow:var(--shadow)}
+.chip b{font-variant-numeric:tabular-nums;background:var(--bg);color:var(--primary);border-radius:999px;padding:1px 8px;margin-left:8px}
+.chip.me{box-shadow:inset 0 0 0 2px var(--primary),var(--shadow)}
+.chip.line b{background:var(--accent);color:var(--free-ink)}
+.bar{height:10px;background:var(--line);border-radius:999px;overflow:hidden;margin:10px 0 4px}
+.bar i{display:block;height:100%;background:var(--primary);width:0;border-radius:999px;transition:width .4s}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+.banner{background:var(--accent);color:var(--free-ink);border-radius:var(--radius);padding:12px 16px;margin:0 0 12px;font-weight:800}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line)}
+.row span{flex:1}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:11px 18px;border-radius:999px;font-size:15px;font-weight:600;z-index:9;max-width:90vw}
+</style>
+</head>
+<body>
+<main>
+
+<!-- ENTRADA -->
+<section id="login" class="box">
+  <h1>Bingo del Debate</h1>
+  <p class="lead">Escribe tu nombre y el código del club. Este dispositivo los recuerda para la próxima.</p>
+  <label for="nm">Tu nombre</label>
+  <input id="nm" maxlength="24" autocomplete="name" placeholder="Ej.: Ana">
+  <label for="cd">Código del club</label>
+  <input id="cd" maxlength="20" autocapitalize="off" placeholder="Te lo dan en el grupo">
+  <button class="full" id="go">Entrar</button>
+  <p id="lerr" class="muted"></p>
+</section>
+
+<!-- JUEGO -->
+<section id="game" class="hidden">
+  <div class="top">
+    <h1>Bingo del Debate</h1>
+    <span class="status muted" id="conn">Conectando…</span>
+  </div>
+  <p class="lead">Toca una casilla cuando pase; otro toque la desmarca. El número de la esquina es cuántos la marcaron.</p>
+
+  <div class="chips" id="players"></div>
+  <div id="banner" class="banner hidden"></div>
+  <div id="nocard" class="box hidden"><p>Todavía no hay cartón para esta sesión. El organizador lo genera en un momento.</p></div>
+  <div class="grid" id="grid"></div>
+
+  <div class="box" id="predbox" style="margin-top:12px">
+    <b>Mi predicción</b> <span class="muted">(va en el centro de tu cartón; márcala si pasa)</span>
+    <input id="pr" maxlength="60" placeholder="Ej.: Alguien va a citar a Nietzsche" style="margin-top:8px">
+    <button class="full" id="prb">Guardar predicción</button>
+    <p class="muted">Toca el nombre de alguien arriba para ver su predicción.</p>
+  </div>
+
+  <div class="box" style="margin-top:12px">
+    <b>Meta del grupo</b> <span class="muted" id="goaltxt"></span>
+    <div class="bar"><i id="goalbar"></i></div>
+    <span class="muted">Casillas que ya pasaron, contando lo que marcó cualquiera.</span>
+  </div>
+
+  <div class="box">
+    <b>¿Se te ocurre una casilla?</b>
+    <input id="sg" maxlength="90" placeholder="Ej.: Alguien dice «en conclusión» dos veces" style="margin-top:8px">
+    <button class="full" id="sgb">Enviar sugerencia</button>
+    <p class="muted">Las casillas deben tratar sobre situaciones, nunca sobre una persona en concreto.</p>
+  </div>
+
+  <p class="muted" style="text-align:center">
+    <a href="#" id="out">Cambiar nombre</a> · <a href="#" id="adm">Organizar</a>
+  </p>
+</section>
+
+<!-- ORGANIZADOR -->
+<section id="admin" class="hidden">
+  <div class="top"><h1>Organizar</h1><button class="ghost small" id="back">Volver al juego</button></div>
+  <div class="box">
+    <button id="newcard">Nuevo cartón para la sesión</button>
+    <p class="muted">Elige 24 casillas al azar entre las aprobadas y borra las marcas de todos.</p>
+    <button class="ghost small" id="seed">Actualizar casillas del club</button>
+    <label for="addt">Agregar casilla (queda aprobada)</label>
+    <input id="addt" maxlength="90" placeholder="Ej.: Alguien dice «en conclusión»">
+    <button class="full" id="addb">Agregar</button>
+  </div>
+  <h2>Sugerencias por revisar</h2><div class="box" id="pend"></div>
+  <h2>Casillas aprobadas (<span id="nok">0</span>)</h2><div class="box" id="okl"></div>
+  <h2>Jugadores</h2><div class="box" id="pl"></div>
+</section>
+
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+// ===== CONFIGURACIÓN (pega aquí la dirección de tu base si cambia) =====
+const firebaseConfig = {
+  apiKey: "AIzaSyAPI0BFEvMsZqXcb0ZgyH27N-6WzNsvfRk",
+  authDomain: "bingo-prac.firebaseapp.com",
+  databaseURL: "https://bingo-prac-default-rtdb.firebaseio.com",
+  projectId: "bingo-prac",
+  storageBucket: "bingo-prac.firebasestorage.app",
+  messagingSenderId: "545341158429",
+  appId: "1:545341158429:web:39b459e1ed2228127042f4"
+};
+const INICIALES = [
+"Alguien responde con un «sí, pero…»","Alguien cuenta una anécdota personal que nadie pidió","Alguien se equivoca de postura","A alguien se le corta el internet","Alguien habla con el micrófono apagado","Aparece una mascota, un familiar o ruido de fondo","Alguien rompe o tira algo teatralizando","Alguien cita a Platón, Aristóteles o Sócrates","Alguien se levanta de la silla en pleno discurso","Alguien usa 1984 u Orwell como referencia","Alguien dice «con todo respeto» justo antes de una pulla","Alguien se queda en blanco más de 5 segundos","Alguien se ríe de su propio chiste","Alguien dice «como dije anteriormente» en el cierre","Alguien dice «eso es una falacia» sin nombrar cuál","Alguien lee claramente de otra pantalla","Alguien dice «déjame terminar»","Alguien responde una pregunta con otra pregunta","Empate técnico","Alguien dice «imagínense» para arrancar un escenario","Alguien golpea la mesa para enfatizar","Alguien empieza con «Buenas noches, señores jurados» en tono de noticiero","Alguien dice «no respondiste mi pregunta»","Alguien acepta un argumento del rival en voz alta","Alguien usa una analogía con comida",
+"Alguien dice «o sea»","Alguien dice «en conclusión»","Alguien dice «en resumen»","Alguien dice «exacto»","Alguien dice «eso no es cierto»","Alguien dice «según estudios» sin decir cuáles","Alguien dice «primero…, segundo…» y no llega al tercero","Alguien pide que le repitan la pregunta","Alguien pide «un segundito» antes de hablar","Alguien agradece al rival o a los jurados","Alguien repite la moción palabra por palabra","Alguien se pasa del tiempo","Alguien termina antes de tiempo","Alguien toma agua en su turno","Alguien se acomoda la cámara o los audífonos","Alguien mueve mucho las manos","Alguien se ríe en pleno careo","Alguien empieza con «eh…»","Alguien menciona al Perú","Alguien da un dato con porcentaje","Alguien pone un ejemplo de su propia vida","Alguien hace una pregunta retórica","Las voces se cruzan en el careo","Alguien escribe en el chat durante un discurso","Alguien llega tarde al Meet","Se escucha eco o acople","Alguien dice «como bien dijo mi contrincante»","Alguien dice «buena pregunta»","Alguien dice «para terminar» y sigue hablando","Alguien cambia de tema en el careo"];
+
+// ===== utilidades =====
+const $ = id => document.getElementById(id);
+const ls = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}, del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
+function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2500)}
+function show(id){["login","game","admin"].forEach(s=>$(s).classList.toggle("hidden",s!==id))}
+function uid(){return Math.random().toString(36).slice(2,10)+Date.now().toString(36)}
+
+let db, room, me, card=null, players={}, pool={};
+let pid = ls.get("bingo_pid"); if(!pid){pid=uid();ls.set("bingo_pid",pid)}
+
+try{ firebase.initializeApp(firebaseConfig); db = firebase.database(); }
+catch(e){ $("lerr").textContent = "No se pudo conectar. Avísale al organizador."; }
+
+// ===== entrada =====
+$("nm").value = ls.get("bingo_name")||"";
+$("cd").value = ls.get("bingo_code")||"";
+$("go").onclick = enter;
+[$("nm"),$("cd")].forEach(i=>i.addEventListener("keydown",e=>{if(e.key==="Enter")enter()}));
+function enter(){
+  const name=$("nm").value.trim().slice(0,24), code=norm($("cd").value);
+  if(!name){$("lerr").textContent="Escribe tu nombre.";return}
+  if(code.length<4){$("lerr").textContent="El código del club tiene al menos 4 letras o números.";return}
+  ls.set("bingo_name",name); ls.set("bingo_code",code);
+  me=name; start(code);
+}
+$("out").onclick=e=>{e.preventDefault();ls.del("bingo_name");location.reload()};
+if(ls.get("bingo_name") && ls.get("bingo_code")){ me=ls.get("bingo_name"); start(ls.get("bingo_code")); }
+
+function start(code){
+  if(!db) return;
+  room = db.ref("rooms/"+code);
+  show("game");
+  const meRef = room.child("players/"+pid);
+  meRef.update({name:me, seen:firebase.database.ServerValue.TIMESTAMP});
+  db.ref(".info/connected").on("value",s=>{
+    $("conn").textContent = s.val() ? "En línea" : "Sin conexión: se guarda al volver";
+    $("conn").style.color = s.val() ? "var(--ok)" : "var(--bad)";
+  });
+  room.child("card").on("value",s=>{card=s.val();render()});
+  room.child("players").on("value",s=>{players=s.val()||{};render();renderAdmin()});
+  room.child("pool").on("value",s=>{pool=s.val()||{};renderAdmin()});
+}
+
+// ===== juego =====
+function marksOf(p){ return (card && p && p.marks && p.marks.s===card.id) ? (p.marks.m||{}) : {} }
+const LINES = (()=>{const L=[];for(let i=0;i<5;i++){L.push([0,1,2,3,4].map(j=>i*5+j));L.push([0,1,2,3,4].map(j=>j*5+i))}L.push([0,6,12,18,24]);L.push([4,8,12,16,20]);return L})();
+function lines(m){return LINES.filter(l=>l.every(i=>m[i])).length}
+function predOf(p){ return (card && p && p.marks && p.marks.s===card.id) ? (p.marks.p||"") : "" }
+
+function render(){
+  const g=$("grid"); g.innerHTML="";
+  $("nocard").classList.toggle("hidden",!!card); $("predbox").classList.toggle("hidden",!card);
+  if(card && document.activeElement!==$("pr")) $("pr").value=predOf(players[pid]);
+  if(!card){ $("players").innerHTML=""; return }
+  const mine = marksOf(players[pid]);
+  const count = {}; const plist = Object.entries(players).filter(([,p])=>p.name);
+  plist.forEach(([,p])=>{const m=marksOf(p);for(const k in m)if(m[k]&&k!=="12")count[k]=(count[k]||0)+1});
+  const total = plist.length||1;
+  for(let i=0;i<25;i++){
+    const c=document.createElement("div"); c.className="cell";
+    if(i===12){
+      const pr=predOf(players[pid]); c.classList.add("free");
+      if(!pr){c.classList.add("empty");c.textContent="Escribe aquí abajo tu predicción";c.onclick=()=>$("pr").focus()}
+      else{const t=document.createElement("span");t.className="tag";t.textContent="mi predicción";c.appendChild(t);c.appendChild(document.createTextNode(pr));if(mine[12])c.classList.add("on");c.onclick=()=>toggle(12,!mine[12])}
+      g.appendChild(c);continue}
+    const idx = i<12?i:i-1;
+    c.textContent = card.items[idx];
+    if(mine[i]) c.classList.add("on");
+    if(count[i]){const n=document.createElement("span");n.className="n";n.textContent=count[i];c.appendChild(n);if(total>2&&count[i]/total>=0.5)c.classList.add("hot")}
+    c.onclick=()=>toggle(i,!mine[i]);
+    g.appendChild(c);
+  }
+  // jugadores
+  const ch=$("players"); ch.innerHTML="";
+  plist.map(([id,p])=>({id,name:p.name,n:Object.values(marksOf(p)).filter(Boolean).length,l:lines(marksOf(p))}))
+    .sort((a,b)=>b.n-a.n)
+    .forEach(p=>{const d=document.createElement("span");d.className="chip"+(p.id===pid?" me":"");
+      d.className+=p.l?" line":"";d.textContent=p.name+(p.id===pid?" (tú)":"");const nb=document.createElement("b");nb.textContent=p.n;d.appendChild(nb);d.title=p.l?"Tiene línea":"";
+      d.onclick=()=>{const pr=predOf(players[p.id]);toast(pr?p.name+" predice: "+pr:p.name+" aún no escribe su predicción")};ch.appendChild(d)});
+  // meta del grupo
+  const done = Object.keys(count).length;
+  $("goaltxt").textContent = done+" de 24";
+  $("goalbar").style.width = (done/24*100)+"%";
+  // primera línea
+  const first = plist.filter(([,p])=>lines(marksOf(p))>0).sort((a,b)=>(a[1].marks.lt||9e15)-(b[1].marks.lt||9e15))[0];
+  const b=$("banner");
+  if(done===24){b.textContent="¡El grupo completó todo el cartón!";b.classList.remove("hidden")}
+  else if(first){b.textContent="Primera línea: "+first[1].name;b.classList.remove("hidden")}
+  else b.classList.add("hidden");
+}
+function toggle(i,on){
+  if(!card) return;
+  const p=players[pid]||{}; const m={...marksOf(p)};
+  if(on) m[i]=true; else delete m[i];
+  const upd={s:card.id,m}; const pr=predOf(p); if(pr) upd.p=pr;
+  const had=marksOf(p), hadLine=lines(had)>0, hasLine=lines(m)>0;
+  if(hasLine) upd.lt = hadLine && p.marks.lt ? p.marks.lt : Date.now();
+  room.child("players/"+pid+"/marks").set(upd);
+}
+
+$("prb").onclick=()=>{
+  if(!card) return; const t=$("pr").value.trim().slice(0,60);
+  const p=players[pid]||{}; const upd={s:card.id,m:{...marksOf(p)}};
+  if(p.marks&&p.marks.s===card.id&&p.marks.lt) upd.lt=p.marks.lt;
+  if(t) upd.p=t; else delete upd.m[12];
+  room.child("players/"+pid+"/marks").set(upd).then(()=>toast(t?"Predicción guardada":"Predicción borrada"));
+};
+// ===== sugerencias =====
+$("sgb").onclick=()=>{
+  const t=$("sg").value.trim().slice(0,90); if(t.length<4){toast("Escribe la casilla primero");return}
+  room.child("pool").push({text:t,by:me,ok:false,t:Date.now()}).then(()=>{$("sg").value="";toast("¡Enviada! El organizador la revisa.")});
+};
+
+// ===== organizador =====
+$("adm").onclick=async e=>{
+  e.preventDefault();
+  const s=await room.child("config/pin").get(); const pin=s.val();
+  if(!pin){const n=prompt("Crea un PIN de organizador (4 a 8 números). Guárdalo, nadie más debe saberlo.");if(!n||!/^\d{4,8}$/.test(n))return;await room.child("config/pin").set(n);sessionStorage.setItem("adm","1")}
+  else if(sessionStorage.getItem("adm")!=="1"){const n=prompt("PIN de organizador:");if(n!==pin){toast("PIN incorrecto");return}sessionStorage.setItem("adm","1")}
+  show("admin"); renderAdmin();
+};
+$("back").onclick=()=>show("game");
+$("seed").onclick=()=>{
+  const keep=new Set(INICIALES.map(norm)); const rm={};
+  Object.entries(pool).forEach(([k,p])=>{if(p.by==="Club"&&!keep.has(norm(p.text)))rm[k]=null});
+  if(Object.keys(rm).length) room.child("pool").update(rm);
+  const have=new Set(Object.values(pool).filter(p=>!(p.by==="Club"&&!keep.has(norm(p.text)))).map(p=>norm(p.text)));
+  const upd={}; INICIALES.forEach(t=>{if(!have.has(norm(t)))upd[room.child("pool").push().key]={text:t,by:"Club",ok:true,t:Date.now()}});
+  if(!Object.keys(upd).length){toast(Object.keys(rm).length?"Casillas del club actualizadas":"Ya estaban al día");return}
+  room.child("pool").update(upd).then(()=>toast("Casillas cargadas"));
+};
+$("addb").onclick=()=>{
+  const t=$("addt").value.trim().slice(0,90); if(t.length<4){toast("Escribe la casilla primero");return}
+  if(Object.values(pool).some(p=>norm(p.text)===norm(t))){toast("Esa casilla ya existe");return}
+  room.child("pool").push({text:t,by:me,ok:true,t:Date.now()}).then(()=>{$("addt").value="";toast("Casilla agregada")});
+};
+$("newcard").onclick=()=>{
+  const ok=Object.values(pool).filter(p=>p.ok).map(p=>p.text);
+  if(ok.length<24){toast("Necesitas al menos 24 aprobadas (hay "+ok.length+")");return}
+  if(card && !confirm("Esto borra las marcas de todos y saca un cartón nuevo. ¿Seguir?")) return;
+  for(let i=ok.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ok[i],ok[j]]=[ok[j],ok[i]]}
+  room.child("card").set({id:uid(),items:ok.slice(0,24),t:Date.now()}).then(()=>{toast("Cartón nuevo listo");show("game")});
+};
+function row(text,btns){const r=document.createElement("div");r.className="row";const s=document.createElement("span");s.textContent=text;r.appendChild(s);btns.forEach(([l,f,g])=>{const b=document.createElement("button");b.className="small"+(g?" ghost":"");b.textContent=l;b.onclick=f;r.appendChild(b)});return r}
+function renderAdmin(){
+  if($("admin").classList.contains("hidden")) return;
+  const pe=$("pend"),ok=$("okl"),pl=$("pl"); pe.innerHTML=ok.innerHTML=pl.innerHTML="";
+  const ents=Object.entries(pool).sort((a,b)=>a[1].t-b[1].t);
+  const pend=ents.filter(([,p])=>!p.ok), apr=ents.filter(([,p])=>p.ok);
+  if(!pend.length) pe.innerHTML='<p class="muted">No hay sugerencias nuevas.</p>';
+  pend.forEach(([k,p])=>pe.appendChild(row(p.text+"  — "+(p.by||"?"),[["Aprobar",()=>room.child("pool/"+k+"/ok").set(true)],["Borrar",()=>room.child("pool/"+k).remove(),1]])));
+  $("nok").textContent=apr.length;
+  apr.forEach(([k,p])=>ok.appendChild(row(p.text,[["Quitar",()=>room.child("pool/"+k).remove(),1]])));
+  Object.entries(players).forEach(([k,p])=>pl.appendChild(row(p.name||"?",[["Sacar",()=>{if(confirm("¿Sacar a "+p.name+"?"))room.child("players/"+k).remove()},1]])));
+}
+</script>
+</body>
+</html>
